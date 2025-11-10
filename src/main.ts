@@ -27,7 +27,6 @@ document.body.append(mapDiv);
 
 const statusPanelDiv = document.createElement("div");
 statusPanelDiv.id = "statusPanel";
-statusPanelDiv.innerHTML = "Step 3: range-limited interaction";
 document.body.append(statusPanelDiv);
 
 const CLASSROOM_LATLNG = leaflet.latLng(
@@ -60,6 +59,18 @@ leaflet.marker(CLASSROOM_LATLNG).addTo(map);
 
 const cellsLayer = leaflet.layerGroup().addTo(map);
 
+let heldToken: number | null = null;
+const modifiedCells = new Map<string, number>();
+
+function updateStatusPanel() {
+  statusPanelDiv.innerHTML =
+    heldToken === null ? "Held token: none" : `Held token: ${heldToken}`;
+}
+
+function cellKey(i: number, j: number): string {
+  return `${i},${j}`;
+}
+
 function cellBounds(i: number, j: number): leaflet.LatLngBounds {
   return leaflet.latLngBounds([
     [
@@ -78,13 +89,31 @@ function baseTokenForCell(i: number, j: number): number {
   return r < 0.4 ? 1 : 0;
 }
 
+function getTokenAt(i: number, j: number): number {
+  const key = cellKey(i, j);
+  if (modifiedCells.has(key)) return modifiedCells.get(key)!;
+  return baseTokenForCell(i, j);
+}
+
+function setTokenAt(i: number, j: number, value: number) {
+  modifiedCells.set(cellKey(i, j), value);
+}
+
 function isCellNearPlayer(i: number, j: number): boolean {
   return Math.max(Math.abs(i), Math.abs(j)) <= INTERACT_RANGE;
 }
 
 function handleCellClick(i: number, j: number) {
   if (!isCellNearPlayer(i, j)) return;
-  statusPanelDiv.innerHTML = `Clicked nearby cell ${i},${j}`;
+
+  const cellToken = getTokenAt(i, j);
+
+  if (heldToken === null && cellToken > 0) {
+    heldToken = cellToken;
+    setTokenAt(i, j, 0);
+    updateStatusPanel();
+    redrawCells();
+  }
 }
 
 function redrawCells() {
@@ -92,7 +121,7 @@ function redrawCells() {
   for (let i = -DRAW_RADIUS; i <= DRAW_RADIUS; i++) {
     for (let j = -DRAW_RADIUS; j <= DRAW_RADIUS; j++) {
       const bounds = cellBounds(i, j);
-      const token = baseTokenForCell(i, j);
+      const token = getTokenAt(i, j);
       const near = isCellNearPlayer(i, j);
 
       const rect = leaflet.rectangle(bounds, {
@@ -123,4 +152,5 @@ function redrawCells() {
   }
 }
 
+updateStatusPanel();
 redrawCells();
