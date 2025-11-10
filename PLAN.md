@@ -24,6 +24,6 @@ Key gameplay challenge: Can players collect and craft tokens from nearby locatio
 - [x] **use `luck()` for deterministic token spawning** – consistent world each reload
 - [x] **limit interaction to nearby cells (range 3)** – highlight reachable cells
 - [x] **add player inventory and pickup** – at most one token in hand, remove it from cell
-- [] **add crafting and win detection** – combine equal tokens to double value; alert when ≥ 16
+- [x] **add crafting and win detection** – combine equal tokens to double value; alert when ≥ 16
 
 ---

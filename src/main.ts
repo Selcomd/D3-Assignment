@@ -37,6 +37,7 @@ const GAMEPLAY_ZOOM_LEVEL = 19;
 const TILE_DEGREES = 1e-4;
 const DRAW_RADIUS = 10;
 const INTERACT_RANGE = 3;
+const WIN_TOKEN_VALUE = 16;
 
 const map = leaflet.map(mapDiv, {
   center: CLASSROOM_LATLNG,
@@ -63,8 +64,9 @@ let heldToken: number | null = null;
 const modifiedCells = new Map<string, number>();
 
 function updateStatusPanel() {
-  statusPanelDiv.innerHTML =
-    heldToken === null ? "Held token: none" : `Held token: ${heldToken}`;
+  statusPanelDiv.innerHTML = heldToken === null
+    ? "Held token: none"
+    : `Held token: ${heldToken}`;
 }
 
 function cellKey(i: number, j: number): string {
@@ -108,11 +110,27 @@ function handleCellClick(i: number, j: number) {
 
   const cellToken = getTokenAt(i, j);
 
-  if (heldToken === null && cellToken > 0) {
-    heldToken = cellToken;
-    setTokenAt(i, j, 0);
+  if (heldToken === null) {
+    if (cellToken > 0) {
+      heldToken = cellToken;
+      setTokenAt(i, j, 0);
+      updateStatusPanel();
+      redrawCells();
+    }
+    return;
+  }
+
+  if (cellToken > 0 && cellToken === heldToken) {
+    const newToken = cellToken * 2;
+    setTokenAt(i, j, newToken);
+    heldToken = null;
     updateStatusPanel();
     redrawCells();
+
+    if (newToken >= WIN_TOKEN_VALUE) {
+      alert(`You crafted ${newToken}! GAME OVER.`);
+    }
+    return;
   }
 }
 
