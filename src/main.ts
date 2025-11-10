@@ -27,7 +27,7 @@ document.body.append(mapDiv);
 
 const statusPanelDiv = document.createElement("div");
 statusPanelDiv.id = "statusPanel";
-statusPanelDiv.innerHTML = "Step 2: deterministic tokens";
+statusPanelDiv.innerHTML = "Step 3: range-limited interaction";
 document.body.append(statusPanelDiv);
 
 const CLASSROOM_LATLNG = leaflet.latLng(
@@ -37,6 +37,7 @@ const CLASSROOM_LATLNG = leaflet.latLng(
 const GAMEPLAY_ZOOM_LEVEL = 19;
 const TILE_DEGREES = 1e-4;
 const DRAW_RADIUS = 10;
+const INTERACT_RANGE = 3;
 
 const map = leaflet.map(mapDiv, {
   center: CLASSROOM_LATLNG,
@@ -77,20 +78,30 @@ function baseTokenForCell(i: number, j: number): number {
   return r < 0.4 ? 1 : 0;
 }
 
+function isCellNearPlayer(i: number, j: number): boolean {
+  return Math.max(Math.abs(i), Math.abs(j)) <= INTERACT_RANGE;
+}
+
+function handleCellClick(i: number, j: number) {
+  if (!isCellNearPlayer(i, j)) return;
+  statusPanelDiv.innerHTML = `Clicked nearby cell ${i},${j}`;
+}
+
 function redrawCells() {
   cellsLayer.clearLayers();
   for (let i = -DRAW_RADIUS; i <= DRAW_RADIUS; i++) {
     for (let j = -DRAW_RADIUS; j <= DRAW_RADIUS; j++) {
       const bounds = cellBounds(i, j);
       const token = baseTokenForCell(i, j);
+      const near = isCellNearPlayer(i, j);
 
-      leaflet
-        .rectangle(bounds, {
-          color: "#888",
-          weight: 1,
-          fillOpacity: 0,
-        })
-        .addTo(cellsLayer);
+      const rect = leaflet.rectangle(bounds, {
+        color: near ? "#2ecc71" : "#888",
+        weight: 1,
+        fillOpacity: 0,
+      });
+      rect.on("click", () => handleCellClick(i, j));
+      rect.addTo(cellsLayer);
 
       if (token > 0) {
         const sw = bounds.getSouthWest();
