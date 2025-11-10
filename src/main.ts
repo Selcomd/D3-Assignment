@@ -5,6 +5,21 @@ import leaflet from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./style.css";
 import "./_leafletWorkaround.ts";
+import luck from "./_luck.ts";
+
+const style = document.createElement("style");
+style.textContent = `
+  .token-label {
+    background: rgba(255,255,255,0.9);
+    border: 1px solid #444;
+    border-radius: 4px;
+    text-align: center;
+    font-size: 0.7rem;
+    width: 30px;
+    line-height: 16px;
+  }
+`;
+document.head.append(style);
 
 const mapDiv = document.createElement("div");
 mapDiv.id = "map";
@@ -12,7 +27,7 @@ document.body.append(mapDiv);
 
 const statusPanelDiv = document.createElement("div");
 statusPanelDiv.id = "statusPanel";
-statusPanelDiv.innerHTML = "Step 1: map + grid";
+statusPanelDiv.innerHTML = "Step 2: deterministic tokens";
 document.body.append(statusPanelDiv);
 
 const CLASSROOM_LATLNG = leaflet.latLng(
@@ -57,16 +72,42 @@ function cellBounds(i: number, j: number): leaflet.LatLngBounds {
   ]);
 }
 
+function baseTokenForCell(i: number, j: number): number {
+  const r = luck(`${i},${j},base`);
+  return r < 0.4 ? 1 : 0;
+}
+
 function redrawCells() {
   cellsLayer.clearLayers();
   for (let i = -DRAW_RADIUS; i <= DRAW_RADIUS; i++) {
     for (let j = -DRAW_RADIUS; j <= DRAW_RADIUS; j++) {
-      const rect = leaflet.rectangle(cellBounds(i, j), {
-        color: "#888",
-        weight: 1,
-        fillOpacity: 0,
-      });
-      rect.addTo(cellsLayer);
+      const bounds = cellBounds(i, j);
+      const token = baseTokenForCell(i, j);
+
+      leaflet
+        .rectangle(bounds, {
+          color: "#888",
+          weight: 1,
+          fillOpacity: 0,
+        })
+        .addTo(cellsLayer);
+
+      if (token > 0) {
+        const sw = bounds.getSouthWest();
+        const ne = bounds.getNorthEast();
+        const centerLat = (sw.lat + ne.lat) / 2;
+        const centerLng = (sw.lng + ne.lng) / 2;
+        leaflet
+          .marker([centerLat, centerLng], {
+            interactive: false,
+            icon: leaflet.divIcon({
+              className: "token-label",
+              html: token.toString(),
+              iconSize: [30, 16],
+            }),
+          })
+          .addTo(cellsLayer);
+      }
     }
   }
 }
