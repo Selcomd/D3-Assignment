@@ -1,7 +1,6 @@
 // Yahir Rico
 
 import leaflet from "leaflet";
-
 import "leaflet/dist/leaflet.css";
 import "./style.css";
 import "./_leafletWorkaround.ts";
@@ -29,10 +28,7 @@ const statusPanelDiv = document.createElement("div");
 statusPanelDiv.id = "statusPanel";
 document.body.append(statusPanelDiv);
 
-const CLASSROOM_LATLNG = leaflet.latLng(
-  36.997936938057016,
-  -122.05703507501151,
-);
+const CLASSROOM_LATLNG = leaflet.latLng(36.997936938057016, -122.05703507501151);
 const GAMEPLAY_ZOOM_LEVEL = 19;
 const TILE_DEGREES = 1e-4;
 const DRAW_RADIUS = 10;
@@ -56,17 +52,17 @@ leaflet
   })
   .addTo(map);
 
-leaflet.marker(CLASSROOM_LATLNG).addTo(map);
+let playerCell = { i: 0, j: 0 };
+const playerMarker = leaflet.marker(CLASSROOM_LATLNG).addTo(map);
 
 const cellsLayer = leaflet.layerGroup().addTo(map);
-
 let heldToken: number | null = null;
 const modifiedCells = new Map<string, number>();
 
 function updateStatusPanel() {
   statusPanelDiv.innerHTML = heldToken === null
-    ? "Held token: none"
-    : `Held token: ${heldToken}`;
+    ? `Held token: none — at (${playerCell.i}, ${playerCell.j})`
+    : `Held token: ${heldToken} — at (${playerCell.i}, ${playerCell.j})`;
 }
 
 function cellKey(i: number, j: number): string {
@@ -102,21 +98,18 @@ function setTokenAt(i: number, j: number, value: number) {
 }
 
 function isCellNearPlayer(i: number, j: number): boolean {
-  return Math.max(Math.abs(i), Math.abs(j)) <= INTERACT_RANGE;
+  return Math.max(Math.abs(i - playerCell.i), Math.abs(j - playerCell.j)) <= INTERACT_RANGE;
 }
 
 function handleCellClick(i: number, j: number) {
   if (!isCellNearPlayer(i, j)) return;
-
   const cellToken = getTokenAt(i, j);
 
-  if (heldToken === null) {
-    if (cellToken > 0) {
-      heldToken = cellToken;
-      setTokenAt(i, j, 0);
-      updateStatusPanel();
-      redrawCells();
-    }
+  if (heldToken === null && cellToken > 0) {
+    heldToken = cellToken;
+    setTokenAt(i, j, 0);
+    updateStatusPanel();
+    redrawCells();
     return;
   }
 
@@ -130,7 +123,6 @@ function handleCellClick(i: number, j: number) {
     if (newToken >= WIN_TOKEN_VALUE) {
       alert(`You crafted ${newToken}! GAME OVER.`);
     }
-    return;
   }
 }
 
@@ -138,16 +130,16 @@ function redrawCells() {
   cellsLayer.clearLayers();
   for (let i = -DRAW_RADIUS; i <= DRAW_RADIUS; i++) {
     for (let j = -DRAW_RADIUS; j <= DRAW_RADIUS; j++) {
-      const bounds = cellBounds(i, j);
-      const token = getTokenAt(i, j);
-      const near = isCellNearPlayer(i, j);
+      const bounds = cellBounds(playerCell.i + i, playerCell.j + j);
+      const token = getTokenAt(playerCell.i + i, playerCell.j + j);
+      const near = isCellNearPlayer(playerCell.i + i, playerCell.j + j);
 
       const rect = leaflet.rectangle(bounds, {
         color: near ? "#2ecc71" : "#888",
         weight: 1,
         fillOpacity: 0,
       });
-      rect.on("click", () => handleCellClick(i, j));
+      rect.on("click", () => handleCellClick(playerCell.i + i, playerCell.j + j));
       rect.addTo(cellsLayer);
 
       if (token > 0) {
@@ -169,6 +161,40 @@ function redrawCells() {
     }
   }
 }
+
+function movePlayer(di: number, dj: number) {
+  playerCell.i += di;
+  playerCell.j += dj;
+
+  const newLat = CLASSROOM_LATLNG.lat + playerCell.i * TILE_DEGREES;
+  const newLng = CLASSROOM_LATLNG.lng + playerCell.j * TILE_DEGREES;
+
+  playerMarker.setLatLng([newLat, newLng]);
+  map.panTo([newLat, newLng]);
+  redrawCells();
+  updateStatusPanel();
+}
+
+window.addEventListener("keydown", (e) => {
+  switch (e.key.toLowerCase()) {
+    case "arrowup":
+    case "w":
+      movePlayer(1, 0);
+      break;
+    case "arrowdown":
+    case "s":
+      movePlayer(-1, 0);
+      break;
+    case "arrowleft":
+    case "a":
+      movePlayer(0, -1);
+      break;
+    case "arrowright":
+    case "d":
+      movePlayer(0, 1);
+      break;
+  }
+});
 
 updateStatusPanel();
 redrawCells();
