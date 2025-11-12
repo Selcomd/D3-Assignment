@@ -169,6 +169,20 @@ function redrawCells() {
   }
 }
 
+function _clearOffscreenCells() {
+  const visibleKeys = new Set<string>();
+  for (let di = -DRAW_RADIUS; di <= DRAW_RADIUS; di++) {
+    for (let dj = -DRAW_RADIUS; dj <= DRAW_RADIUS; dj++) {
+      visibleKeys.add(cellKey(playerCell.i + di, playerCell.j + dj));
+    }
+  }
+  for (const key of modifiedCells.keys()) {
+    if (!visibleKeys.has(key)) {
+      modifiedCells.delete(key);
+    }
+  }
+}
+
 function movePlayer(di: number, dj: number) {
   playerCell.i += di;
   playerCell.j += dj;
@@ -180,6 +194,8 @@ function movePlayer(di: number, dj: number) {
   map.panTo([newLat, newLng]);
   redrawCells();
   updateStatusPanel();
+
+  _clearOffscreenCells();
 }
 
 globalThis.addEventListener("keydown", (e) => {
@@ -202,7 +218,6 @@ globalThis.addEventListener("keydown", (e) => {
       break;
   }
 });
-
 
 updateStatusPanel();
 redrawCells();
