@@ -36,7 +36,7 @@ const GAMEPLAY_ZOOM_LEVEL = 19;
 const TILE_DEGREES = 1e-4;
 const DRAW_RADIUS = 10;
 const INTERACT_RANGE = 3;
-const WIN_TOKEN_VALUE = 16;
+const WIN_TOKEN_VALUE = 32;
 
 const map = leaflet.map(mapDiv, {
   center: CLASSROOM_LATLNG,
