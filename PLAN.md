@@ -32,9 +32,9 @@ Key gameplay challenge: Can players collect and craft tokens from nearby locatio
 
 ## D3.b
 
-- [x] **add player movement controls** – implement buttons or keypresses for N/S/E/W movement, shifting player position by one grid step each time  
-- [] **keep cells visible during movement** – when moving, continuously spawn/despawn cells to always fill the screen to its edges  
-- [ ] **make cells memoryless off-screen** – clear old cell data when they move out of range so they reset when revisited  
+- [x] **add player movement controls** – implement buttons or keypresses for N/S/E/W movement, shifting player position by one grid step each time
+- [x] **keep cells visible during movement** – when moving, continuously spawn/despawn cells to always fill the screen to its edges
+- [ ] **make cells memoryless off-screen** – clear old cell data when they move out of range so they reset when revisited
 - [ ] **raise crafting goal threshold** – increase win condition (≥ 32) to reflect expanded gameplay with movement
 
 ---
