@@ -95,15 +95,26 @@ function baseTokenForCell(i: number, j: number): number {
   return r < 0.4 ? 1 : 0;
 }
 
-function getTokenAt(i: number, j: number): number {
+function saveCellState(_key: string, _state: CellState) {
+}
+
+function restoreCellState(i: number, j: number): number | null {
   const key = cellKey(i, j);
   const found = modifiedCells.get(key);
-  if (found) return found.token;
+  return found ? found.token : null;
+}
+
+function getTokenAt(i: number, j: number): number {
+  const restored = restoreCellState(i, j);
+  if (restored !== null) return restored;
   return baseTokenForCell(i, j);
 }
 
 function setTokenAt(i: number, j: number, value: number) {
-  modifiedCells.set(cellKey(i, j), { token: value });
+  const key = cellKey(i, j);
+  const state: CellState = { token: value };
+  modifiedCells.set(key, state);
+  saveCellState(key, state);
 }
 
 function isCellNearPlayer(i: number, j: number): boolean {
@@ -175,19 +186,6 @@ function redrawCells() {
   }
 }
 
-function clearOffscreenCells() {
-  const visible = new Set<string>();
-
-  for (let di = -DRAW_RADIUS; di <= DRAW_RADIUS; di++) {
-    for (let dj = -DRAW_RADIUS; dj <= DRAW_RADIUS; dj++) {
-      visible.add(cellKey(playerCell.i + di, playerCell.j + dj));
-    }
-  }
-  for (const key of modifiedCells.keys()) {
-    if (!visible.has(key)) modifiedCells.delete(key);
-  }
-}
-
 function movePlayer(di: number, dj: number) {
   playerCell.i += di;
   playerCell.j += dj;
@@ -199,7 +197,6 @@ function movePlayer(di: number, dj: number) {
   map.panTo([newLat, newLng]);
   redrawCells();
   updateStatusPanel();
-  clearOffscreenCells();
 }
 
 globalThis.addEventListener("keydown", (e) => {
