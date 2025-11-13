@@ -55,11 +55,8 @@ leaflet
   })
   .addTo(map);
 
-interface CellState {
-  token: number;
-}
 
-const modifiedCells = new Map<string, CellState>();
+const modifiedCells = new Map<string, number>();
 
 const playerCell = { i: 0, j: 0 };
 const playerMarker = leaflet.marker(CLASSROOM_LATLNG).addTo(map);
@@ -95,13 +92,14 @@ function baseTokenForCell(i: number, j: number): number {
   return r < 0.4 ? 1 : 0;
 }
 
-function saveCellState(_key: string, _state: CellState) {
+
+function saveCellState(_key: string, _token: number) {
 }
 
 function restoreCellState(i: number, j: number): number | null {
   const key = cellKey(i, j);
-  const found = modifiedCells.get(key);
-  return found ? found.token : null;
+  if (modifiedCells.has(key)) return modifiedCells.get(key)!;
+  return null;
 }
 
 function getTokenAt(i: number, j: number): number {
@@ -112,9 +110,8 @@ function getTokenAt(i: number, j: number): number {
 
 function setTokenAt(i: number, j: number, value: number) {
   const key = cellKey(i, j);
-  const state: CellState = { token: value };
-  modifiedCells.set(key, state);
-  saveCellState(key, state);
+  modifiedCells.set(key, value);
+  saveCellState(key, value);
 }
 
 function isCellNearPlayer(i: number, j: number): boolean {
