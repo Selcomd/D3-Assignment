@@ -55,12 +55,17 @@ leaflet
   })
   .addTo(map);
 
+interface CellState {
+  token: number;
+}
+
+const modifiedCells = new Map<string, CellState>();
+
 const playerCell = { i: 0, j: 0 };
 const playerMarker = leaflet.marker(CLASSROOM_LATLNG).addTo(map);
 
 const cellsLayer = leaflet.layerGroup().addTo(map);
 let heldToken: number | null = null;
-const modifiedCells = new Map<string, number>();
 
 function updateStatusPanel() {
   statusPanelDiv.innerHTML = heldToken === null
@@ -92,12 +97,13 @@ function baseTokenForCell(i: number, j: number): number {
 
 function getTokenAt(i: number, j: number): number {
   const key = cellKey(i, j);
-  if (modifiedCells.has(key)) return modifiedCells.get(key)!;
+  const found = modifiedCells.get(key);
+  if (found) return found.token;
   return baseTokenForCell(i, j);
 }
 
 function setTokenAt(i: number, j: number, value: number) {
-  modifiedCells.set(cellKey(i, j), value);
+  modifiedCells.set(cellKey(i, j), { token: value });
 }
 
 function isCellNearPlayer(i: number, j: number): boolean {
@@ -117,7 +123,7 @@ function handleCellClick(i: number, j: number) {
     return;
   }
 
-  if (cellToken > 0 && cellToken === heldToken) {
+  if (cellToken > 0 && heldToken === cellToken) {
     const newToken = cellToken * 2;
     setTokenAt(i, j, newToken);
     heldToken = null;
@@ -132,54 +138,53 @@ function handleCellClick(i: number, j: number) {
 
 function redrawCells() {
   cellsLayer.clearLayers();
-  for (let i = -DRAW_RADIUS; i <= DRAW_RADIUS; i++) {
-    for (let j = -DRAW_RADIUS; j <= DRAW_RADIUS; j++) {
-      const bounds = cellBounds(playerCell.i + i, playerCell.j + j);
-      const token = getTokenAt(playerCell.i + i, playerCell.j + j);
-      const near = isCellNearPlayer(playerCell.i + i, playerCell.j + j);
+
+  for (let di = -DRAW_RADIUS; di <= DRAW_RADIUS; di++) {
+    for (let dj = -DRAW_RADIUS; dj <= DRAW_RADIUS; dj++) {
+      const ci = playerCell.i + di;
+      const cj = playerCell.j + dj;
+
+      const bounds = cellBounds(ci, cj);
+      const token = getTokenAt(ci, cj);
+      const near = isCellNearPlayer(ci, cj);
 
       const rect = leaflet.rectangle(bounds, {
         color: near ? "#2ecc71" : "#888",
         weight: 1,
         fillOpacity: 0,
       });
-      rect.on(
-        "click",
-        () => handleCellClick(playerCell.i + i, playerCell.j + j),
-      );
+      rect.on("click", () => handleCellClick(ci, cj));
       rect.addTo(cellsLayer);
 
       if (token > 0) {
         const sw = bounds.getSouthWest();
         const ne = bounds.getNorthEast();
-        const centerLat = (sw.lat + ne.lat) / 2;
-        const centerLng = (sw.lng + ne.lng) / 2;
-        leaflet
-          .marker([centerLat, centerLng], {
+        leaflet.marker(
+          [(sw.lat + ne.lat) / 2, (sw.lng + ne.lng) / 2],
+          {
             interactive: false,
             icon: leaflet.divIcon({
               className: "token-label",
               html: token.toString(),
               iconSize: [30, 16],
             }),
-          })
-          .addTo(cellsLayer);
+          },
+        ).addTo(cellsLayer);
       }
     }
   }
 }
 
-function _clearOffscreenCells() {
-  const visibleKeys = new Set<string>();
+function clearOffscreenCells() {
+  const visible = new Set<string>();
+
   for (let di = -DRAW_RADIUS; di <= DRAW_RADIUS; di++) {
     for (let dj = -DRAW_RADIUS; dj <= DRAW_RADIUS; dj++) {
-      visibleKeys.add(cellKey(playerCell.i + di, playerCell.j + dj));
+      visible.add(cellKey(playerCell.i + di, playerCell.j + dj));
     }
   }
   for (const key of modifiedCells.keys()) {
-    if (!visibleKeys.has(key)) {
-      modifiedCells.delete(key);
-    }
+    if (!visible.has(key)) modifiedCells.delete(key);
   }
 }
 
@@ -194,8 +199,7 @@ function movePlayer(di: number, dj: number) {
   map.panTo([newLat, newLng]);
   redrawCells();
   updateStatusPanel();
-
-  _clearOffscreenCells();
+  clearOffscreenCells();
 }
 
 globalThis.addEventListener("keydown", (e) => {

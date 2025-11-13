@@ -38,3 +38,10 @@ Key gameplay challenge: Can players collect and craft tokens from nearby locatio
 - [x] **raise crafting goal threshold** – increase win condition (≥ 32) to reflect expanded gameplay with movement
 
 ---
+
+## D3.c
+
+- [x] **implement cell Flyweight pattern** – avoid storing redundant cell data; only allocate memory for modified cells
+- [ ] **apply Memento-style persistence** – store and restore modified cell state when scrolled off-screen
+- [ ] **refactor cell storage using `Map<CellKey, TokenValue>`** – make each cell’s state easily serializable and restorable
+- [ ] **test persistent modifications** – verify that cells maintain their modified values when leaving and re-entering the visible map
