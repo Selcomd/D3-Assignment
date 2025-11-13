@@ -92,7 +92,6 @@ function baseTokenForCell(i: number, j: number): number {
   return r < 0.4 ? 1 : 0;
 }
 
-
 function saveCellState(_key: string, _token: number) {
 }
 
@@ -196,6 +195,19 @@ function movePlayer(di: number, dj: number) {
   updateStatusPanel();
 }
 
+function testPersistence(i: number, j: number) {
+  const key = cellKey(i, j);
+  const base = baseTokenForCell(i, j);
+  const modified = modifiedCells.get(key);
+
+  console.log("=== Persistence Test ===");
+  console.log("Cell:", key);
+  console.log("Base token:", base);
+  console.log("Modified token:", modified ?? "(none)");
+  console.log("Value returned by getTokenAt:", getTokenAt(i, j));
+  console.log("========================");
+}
+
 globalThis.addEventListener("keydown", (e) => {
   switch (e.key.toLowerCase()) {
     case "arrowup":
@@ -213,6 +225,9 @@ globalThis.addEventListener("keydown", (e) => {
     case "arrowright":
     case "d":
       movePlayer(0, 1);
+      break;
+    case "p":
+      testPersistence(playerCell.i, playerCell.j);
       break;
   }
 });
