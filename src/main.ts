@@ -1,5 +1,5 @@
 // Yahir Rico
-
+// D3
 import leaflet from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./style.css";
@@ -54,7 +54,6 @@ leaflet
       '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
   })
   .addTo(map);
-
 
 const modifiedCells = new Map<string, number>();
 
