@@ -42,7 +42,6 @@ let movementMode = urlParams.get("movement") ??
   "buttons";
 
 movementMode = movementMode === "geolocation" ? "geolocation" : "buttons";
-
 localStorage.setItem("movementMode", movementMode);
 
 function applyMovementMode(mode: string) {
@@ -50,12 +49,10 @@ function applyMovementMode(mode: string) {
   const baseUrl = globalThis.location.origin + globalThis.location.pathname;
   globalThis.location.href = `${baseUrl}?movement=${mode}`;
 }
-
 const CLASSROOM_LATLNG = leaflet.latLng(
   36.997936938057016,
   -122.05703507501151,
 );
-
 const GAMEPLAY_ZOOM_LEVEL = 19;
 const TILE_DEGREES = 1e-4;
 const DRAW_RADIUS = 10;
@@ -78,12 +75,50 @@ leaflet.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
 }).addTo(map);
 
 const modifiedCells = new Map<string, number>();
-
 const playerCell = { i: 0, j: 0 };
-const playerMarker = leaflet.marker(CLASSROOM_LATLNG).addTo(map);
-
-const cellsLayer = leaflet.layerGroup().addTo(map);
 let heldToken: number | null = null;
+const playerMarker = leaflet.marker(CLASSROOM_LATLNG).addTo(map);
+const cellsLayer = leaflet.layerGroup().addTo(map);
+
+interface GameSave {
+  playerCell: { i: number; j: number };
+  heldToken: number | null;
+  modifiedCells: [string, number][];
+}
+
+function saveGameState() {
+  const data: GameSave = {
+    playerCell: { ...playerCell },
+    heldToken,
+    modifiedCells: [...modifiedCells.entries()],
+  };
+  localStorage.setItem("gameSave", JSON.stringify(data));
+}
+
+function loadGameState() {
+  const raw = localStorage.getItem("gameSave");
+  if (!raw) return;
+
+  try {
+    const data: GameSave = JSON.parse(raw);
+
+    playerCell.i = data.playerCell.i;
+    playerCell.j = data.playerCell.j;
+    heldToken = data.heldToken;
+
+    modifiedCells.clear();
+    for (const [k, v] of data.modifiedCells) {
+      modifiedCells.set(k, v);
+    }
+    const lat = CLASSROOM_LATLNG.lat + playerCell.i * TILE_DEGREES;
+    const lng = CLASSROOM_LATLNG.lng + playerCell.j * TILE_DEGREES;
+    playerMarker.setLatLng([lat, lng]);
+    map.panTo([lat, lng]);
+  } catch (_err) {
+    console.error("Corrupt save data — clearing.");
+    localStorage.removeItem("gameSave");
+  }
+}
 
 function updateStatusPanel() {
   statusPanelDiv.innerHTML = `
@@ -127,6 +162,7 @@ function getTokenAt(i: number, j: number): number {
 
 function setTokenAt(i: number, j: number, value: number) {
   modifiedCells.set(cellKey(i, j), value);
+  saveGameState();
 }
 
 function isCellNearPlayer(i: number, j: number): boolean {
@@ -143,6 +179,7 @@ function handleCellClick(i: number, j: number) {
     setTokenAt(i, j, 0);
     updateStatusPanel();
     redrawCells();
+    saveGameState();
     return;
   }
 
@@ -152,6 +189,7 @@ function handleCellClick(i: number, j: number) {
     heldToken = null;
     updateStatusPanel();
     redrawCells();
+    saveGameState();
 
     if (newToken >= WIN_TOKEN_VALUE) {
       alert(`You crafted ${newToken}! GAME OVER.`);
@@ -176,23 +214,23 @@ function redrawCells() {
         weight: 1,
         fillOpacity: 0,
       });
+
       rect.on("click", () => handleCellClick(ci, cj));
       rect.addTo(cellsLayer);
 
       if (token > 0) {
         const sw = bounds.getSouthWest();
         const ne = bounds.getNorthEast();
-        leaflet.marker(
-          [(sw.lat + ne.lat) / 2, (sw.lng + ne.lng) / 2],
-          {
+        leaflet
+          .marker([(sw.lat + ne.lat) / 2, (sw.lng + ne.lng) / 2], {
             interactive: false,
             icon: leaflet.divIcon({
               className: "token-label",
               html: token.toString(),
               iconSize: [30, 16],
             }),
-          },
-        ).addTo(cellsLayer);
+          })
+          .addTo(cellsLayer);
       }
     }
   }
@@ -207,8 +245,10 @@ function movePlayer(di: number, dj: number) {
 
   playerMarker.setLatLng([newLat, newLng]);
   map.panTo([newLat, newLng]);
+
   redrawCells();
   updateStatusPanel();
+  saveGameState();
 }
 interface MovementController {
   start(): void;
@@ -218,20 +258,20 @@ class ButtonMovementController implements MovementController {
   start(): void {
     globalThis.addEventListener("keydown", (e) => {
       switch (e.key.toLowerCase()) {
-        case "arrowup":
         case "w":
+        case "arrowup":
           movePlayer(1, 0);
           break;
-        case "arrowdown":
         case "s":
+        case "arrowdown":
           movePlayer(-1, 0);
           break;
-        case "arrowleft":
         case "a":
+        case "arrowleft":
           movePlayer(0, -1);
           break;
-        case "arrowright":
         case "d":
+        case "arrowright":
           movePlayer(0, 1);
           break;
       }
@@ -245,7 +285,7 @@ class GeoMovementController implements MovementController {
 
   start(): void {
     if (!navigator.geolocation) {
-      console.warn("No GPS → fallback to buttons");
+      console.warn("GPS unsupported → fallback to buttons");
       new ButtonMovementController().start();
       return;
     }
@@ -286,11 +326,12 @@ class GeoMovementController implements MovementController {
   }
 }
 
-const movementController: MovementController = movementMode === "geolocation"
+const controller: MovementController = movementMode === "geolocation"
   ? new GeoMovementController()
   : new ButtonMovementController();
 
-movementController.start();
+controller.start();
 
+loadGameState();
 updateStatusPanel();
 redrawCells();
