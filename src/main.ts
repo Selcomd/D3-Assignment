@@ -16,6 +16,15 @@ style.textContent = `
     width: 30px;
     line-height: 16px;
   }
+  #modeToggle {
+    margin-left: 10px;
+    padding: 2px 6px;
+    font-size: 0.7rem;
+    border: 1px solid #444;
+    background: #ddd;
+    cursor: pointer;
+    border-radius: 4px;
+  }
 `;
 document.head.append(style);
 
@@ -26,6 +35,21 @@ document.body.append(mapDiv);
 const statusPanelDiv = document.createElement("div");
 statusPanelDiv.id = "statusPanel";
 document.body.append(statusPanelDiv);
+
+const urlParams = new URLSearchParams(globalThis.location.search);
+let movementMode = urlParams.get("movement") ??
+  localStorage.getItem("movementMode") ??
+  "buttons";
+
+movementMode = movementMode === "geolocation" ? "geolocation" : "buttons";
+
+localStorage.setItem("movementMode", movementMode);
+
+function applyMovementMode(mode: string) {
+  localStorage.setItem("movementMode", mode);
+  const baseUrl = globalThis.location.origin + globalThis.location.pathname;
+  globalThis.location.href = `${baseUrl}?movement=${mode}`;
+}
 
 const CLASSROOM_LATLNG = leaflet.latLng(
   36.997936938057016,
@@ -47,13 +71,11 @@ const map = leaflet.map(mapDiv, {
   scrollWheelZoom: false,
 });
 
-leaflet
-  .tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution:
-      '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-  })
-  .addTo(map);
+leaflet.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 19,
+  attribution:
+    '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+}).addTo(map);
 
 const modifiedCells = new Map<string, number>();
 
@@ -64,9 +86,17 @@ const cellsLayer = leaflet.layerGroup().addTo(map);
 let heldToken: number | null = null;
 
 function updateStatusPanel() {
-  statusPanelDiv.innerHTML = heldToken === null
-    ? `Held token: none — at (${playerCell.i}, ${playerCell.j})`
-    : `Held token: ${heldToken} — at (${playerCell.i}, ${playerCell.j})`;
+  statusPanelDiv.innerHTML = `
+    Held token: ${heldToken === null ? "none" : heldToken}
+    — at (${playerCell.i}, ${playerCell.j})
+    — Mode: ${movementMode}
+    <button id="modeToggle">Switch</button>
+  `;
+
+  document.getElementById("modeToggle")!.addEventListener("click", () => {
+    const newMode = movementMode === "buttons" ? "geolocation" : "buttons";
+    applyMovementMode(newMode);
+  });
 }
 
 function cellKey(i: number, j: number): string {
@@ -91,24 +121,12 @@ function baseTokenForCell(i: number, j: number): number {
   return r < 0.4 ? 1 : 0;
 }
 
-function saveCellState(_key: string, _token: number) {}
-
-function restoreCellState(i: number, j: number): number | null {
-  const key = cellKey(i, j);
-  if (modifiedCells.has(key)) return modifiedCells.get(key)!;
-  return null;
-}
-
 function getTokenAt(i: number, j: number): number {
-  const restored = restoreCellState(i, j);
-  if (restored !== null) return restored;
-  return baseTokenForCell(i, j);
+  return modifiedCells.get(cellKey(i, j)) ?? baseTokenForCell(i, j);
 }
 
 function setTokenAt(i: number, j: number, value: number) {
-  const key = cellKey(i, j);
-  modifiedCells.set(key, value);
-  saveCellState(key, value);
+  modifiedCells.set(cellKey(i, j), value);
 }
 
 function isCellNearPlayer(i: number, j: number): boolean {
@@ -192,7 +210,6 @@ function movePlayer(di: number, dj: number) {
   redrawCells();
   updateStatusPanel();
 }
-
 interface MovementController {
   start(): void;
 }
@@ -223,20 +240,57 @@ class ButtonMovementController implements MovementController {
 }
 
 class GeoMovementController implements MovementController {
+  lastLat: number | null = null;
+  lastLng: number | null = null;
+
   start(): void {
+    if (!navigator.geolocation) {
+      console.warn("No GPS → fallback to buttons");
+      new ButtonMovementController().start();
+      return;
+    }
+
+    navigator.geolocation.watchPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+
+        if (this.lastLat === null || this.lastLng === null) {
+          this.lastLat = latitude;
+          this.lastLng = longitude;
+          return;
+        }
+
+        const dLat = latitude - this.lastLat;
+        const dLng = longitude - this.lastLng;
+
+        this.lastLat = latitude;
+        this.lastLng = longitude;
+
+        const moveI = Math.round(dLat / TILE_DEGREES);
+        const moveJ = Math.round(dLng / TILE_DEGREES);
+
+        if (Math.abs(moveI) > 0 || Math.abs(moveJ) > 0) {
+          movePlayer(moveI, moveJ);
+        }
+      },
+      (err) => {
+        console.error("GPS error:", err);
+        new ButtonMovementController().start();
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 300,
+        timeout: 4000,
+      },
+    );
   }
 }
-const params = new URLSearchParams(globalThis.location.search);
-const movementMode = params.get("movement") ?? "buttons";
 
-let controller: MovementController;
-if (movementMode === "geolocation") {
-  controller = new GeoMovementController();
-} else {
-  controller = new ButtonMovementController();
-}
+const movementController: MovementController = movementMode === "geolocation"
+  ? new GeoMovementController()
+  : new ButtonMovementController();
 
-controller.start();
+movementController.start();
 
 updateStatusPanel();
 redrawCells();
