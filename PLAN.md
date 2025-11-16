@@ -51,7 +51,7 @@ Key gameplay challenge: Can players collect and craft tokens from nearby locatio
 ## D3.d
 
 - [x] **add movement mode selector** – determine movement system from `movement=buttons` or `?movement=geolocation`
-- [ ] **add movement controller interface** – hide input system behind a facade so the rest of the game only calls `movement.start()`
+- [x] **add movement controller interface** – hide input system behind a facade so the rest of the game only calls `movement.start()`
 - [ ] **implement button-based controller** – reuse WASD/arrow key movement inside the new interface
 - [ ] **implement geolocation-based controller** – move the player when the device’s real-world position changes
 - [ ] **persist game state using `localStorage`** – store (player position, modifiedCells, heldToken) and restore on page load

@@ -62,17 +62,10 @@ const playerMarker = leaflet.marker(CLASSROOM_LATLNG).addTo(map);
 const cellsLayer = leaflet.layerGroup().addTo(map);
 let heldToken: number | null = null;
 
-const params = new URLSearchParams(globalThis.location.search);
-const movementMode = params.get("movement") === "geolocation"
-  ? "geolocation"
-  : "buttons";
-
 function updateStatusPanel() {
-  statusPanelDiv.innerHTML =
-    `Mode: ${movementMode}<br>` +
-    (heldToken === null
-      ? `Held token: none — at (${playerCell.i}, ${playerCell.j})`
-      : `Held token: ${heldToken} — at (${playerCell.i}, ${playerCell.j})`);
+  statusPanelDiv.innerHTML = heldToken === null
+    ? `Held token: none — at (${playerCell.i}, ${playerCell.j})`
+    : `Held token: ${heldToken} — at (${playerCell.i}, ${playerCell.j})`;
 }
 
 function cellKey(i: number, j: number): string {
@@ -200,41 +193,30 @@ function movePlayer(di: number, dj: number) {
   updateStatusPanel();
 }
 
-function _testPersistence(i: number, j: number) {
-  const key = cellKey(i, j);
-  const base = baseTokenForCell(i, j);
-  const modified = modifiedCells.get(key);
-
-  console.log("=== Persistence Test ===");
-  console.log("Cell:", key);
-  console.log("Base token:", base);
-  console.log("Modified token:", modified ?? "(none)");
-  console.log("Value returned by getTokenAt:", getTokenAt(i, j));
-  console.log("========================");
+interface MovementController {
+  start(): void;
 }
 
-if (movementMode === "buttons") {
-  globalThis.addEventListener("keydown", (e) => {
-    switch (e.key.toLowerCase()) {
-      case "arrowup":
-      case "w":
-        movePlayer(1, 0);
-        break;
-      case "arrowdown":
-      case "s":
-        movePlayer(-1, 0);
-        break;
-      case "arrowleft":
-      case "a":
-        movePlayer(0, -1);
-        break;
-      case "arrowright":
-      case "d":
-        movePlayer(0, 1);
-        break;
-    }
-  });
+class ButtonMovementController implements MovementController {
+  start() {
+  }
 }
+
+class GeoMovementController implements MovementController {
+  start() {
+  }
+}
+const params = new URLSearchParams(globalThis.location.search);
+const movementMode = params.get("movement") ?? "buttons";
+
+let controller: MovementController;
+if (movementMode === "geolocation") {
+  controller = new GeoMovementController();
+} else {
+  controller = new ButtonMovementController();
+}
+
+controller.start();
 
 updateStatusPanel();
 redrawCells();
