@@ -1,5 +1,4 @@
 // Yahir Rico
-// D3
 import leaflet from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./style.css";
@@ -63,10 +62,17 @@ const playerMarker = leaflet.marker(CLASSROOM_LATLNG).addTo(map);
 const cellsLayer = leaflet.layerGroup().addTo(map);
 let heldToken: number | null = null;
 
+const params = new URLSearchParams(globalThis.location.search);
+const movementMode = params.get("movement") === "geolocation"
+  ? "geolocation"
+  : "buttons";
+
 function updateStatusPanel() {
-  statusPanelDiv.innerHTML = heldToken === null
-    ? `Held token: none — at (${playerCell.i}, ${playerCell.j})`
-    : `Held token: ${heldToken} — at (${playerCell.i}, ${playerCell.j})`;
+  statusPanelDiv.innerHTML =
+    `Mode: ${movementMode}<br>` +
+    (heldToken === null
+      ? `Held token: none — at (${playerCell.i}, ${playerCell.j})`
+      : `Held token: ${heldToken} — at (${playerCell.i}, ${playerCell.j})`);
 }
 
 function cellKey(i: number, j: number): string {
@@ -194,7 +200,7 @@ function movePlayer(di: number, dj: number) {
   updateStatusPanel();
 }
 
-function testPersistence(i: number, j: number) {
+function _testPersistence(i: number, j: number) {
   const key = cellKey(i, j);
   const base = baseTokenForCell(i, j);
   const modified = modifiedCells.get(key);
@@ -207,29 +213,28 @@ function testPersistence(i: number, j: number) {
   console.log("========================");
 }
 
-globalThis.addEventListener("keydown", (e) => {
-  switch (e.key.toLowerCase()) {
-    case "arrowup":
-    case "w":
-      movePlayer(1, 0);
-      break;
-    case "arrowdown":
-    case "s":
-      movePlayer(-1, 0);
-      break;
-    case "arrowleft":
-    case "a":
-      movePlayer(0, -1);
-      break;
-    case "arrowright":
-    case "d":
-      movePlayer(0, 1);
-      break;
-    case "p":
-      testPersistence(playerCell.i, playerCell.j);
-      break;
-  }
-});
+if (movementMode === "buttons") {
+  globalThis.addEventListener("keydown", (e) => {
+    switch (e.key.toLowerCase()) {
+      case "arrowup":
+      case "w":
+        movePlayer(1, 0);
+        break;
+      case "arrowdown":
+      case "s":
+        movePlayer(-1, 0);
+        break;
+      case "arrowleft":
+      case "a":
+        movePlayer(0, -1);
+        break;
+      case "arrowright":
+      case "d":
+        movePlayer(0, 1);
+        break;
+    }
+  });
+}
 
 updateStatusPanel();
 redrawCells();
