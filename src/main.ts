@@ -31,6 +31,7 @@ const CLASSROOM_LATLNG = leaflet.latLng(
   36.997936938057016,
   -122.05703507501151,
 );
+
 const GAMEPLAY_ZOOM_LEVEL = 19;
 const TILE_DEGREES = 1e-4;
 const DRAW_RADIUS = 10;
@@ -90,8 +91,7 @@ function baseTokenForCell(i: number, j: number): number {
   return r < 0.4 ? 1 : 0;
 }
 
-function saveCellState(_key: string, _token: number) {
-}
+function saveCellState(_key: string, _token: number) {}
 
 function restoreCellState(i: number, j: number): number | null {
   const key = cellKey(i, j);
@@ -198,12 +198,32 @@ interface MovementController {
 }
 
 class ButtonMovementController implements MovementController {
-  start() {
+  start(): void {
+    globalThis.addEventListener("keydown", (e) => {
+      switch (e.key.toLowerCase()) {
+        case "arrowup":
+        case "w":
+          movePlayer(1, 0);
+          break;
+        case "arrowdown":
+        case "s":
+          movePlayer(-1, 0);
+          break;
+        case "arrowleft":
+        case "a":
+          movePlayer(0, -1);
+          break;
+        case "arrowright":
+        case "d":
+          movePlayer(0, 1);
+          break;
+      }
+    });
   }
 }
 
 class GeoMovementController implements MovementController {
-  start() {
+  start(): void {
   }
 }
 const params = new URLSearchParams(globalThis.location.search);
