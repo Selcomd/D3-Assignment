@@ -1,4 +1,5 @@
 // Yahir Rico
+// D3
 import leaflet from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./style.css";
@@ -46,10 +47,9 @@ statusPanelDiv.id = "statusPanel";
 document.body.append(statusPanelDiv);
 
 const urlParams = new URLSearchParams(globalThis.location.search);
-let movementMode =
-  urlParams.get("movement") ??
-    localStorage.getItem("movementMode") ??
-    "buttons";
+let movementMode = urlParams.get("movement") ??
+  localStorage.getItem("movementMode") ??
+  "buttons";
 
 movementMode = movementMode === "geolocation" ? "geolocation" : "buttons";
 localStorage.setItem("movementMode", movementMode);
@@ -186,7 +186,8 @@ function setTokenAt(i: number, j: number, value: number) {
 }
 
 function isCellNearPlayer(i: number, j: number): boolean {
-  return Math.max(Math.abs(i - playerCell.i), Math.abs(j - playerCell.j)) <= INTERACT_RANGE;
+  return Math.max(Math.abs(i - playerCell.i), Math.abs(j - playerCell.j)) <=
+    INTERACT_RANGE;
 }
 
 function handleCellClick(i: number, j: number) {
