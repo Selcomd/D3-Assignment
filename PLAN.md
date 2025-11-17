@@ -55,4 +55,4 @@ Key gameplay challenge: Can players collect and craft tokens from nearby locatio
 - [x] **implement button-based controller** – reuse WASD/arrow key movement inside the new interface
 - [x] **implement geolocation-based controller** – move the player when the device’s real-world position changes
 - [x] **persist game state using `localStorage`** – store (player position, modifiedCells, heldToken) and restore on page load
-- [ ] **add new-game control** – allow the player to clear saved data and restart fresh
+- [x] **add new-game control** – allow the player to clear saved data and restart fresh

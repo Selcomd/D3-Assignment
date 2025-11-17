@@ -25,6 +25,15 @@ style.textContent = `
     cursor: pointer;
     border-radius: 4px;
   }
+  #resetGame {
+    margin-left: 6px;
+    padding: 2px 6px;
+    font-size: 0.7rem;
+    border: 1px solid #444;
+    background: #eee;
+    cursor: pointer;
+    border-radius: 4px;
+  }
 `;
 document.head.append(style);
 
@@ -37,9 +46,10 @@ statusPanelDiv.id = "statusPanel";
 document.body.append(statusPanelDiv);
 
 const urlParams = new URLSearchParams(globalThis.location.search);
-let movementMode = urlParams.get("movement") ??
-  localStorage.getItem("movementMode") ??
-  "buttons";
+let movementMode =
+  urlParams.get("movement") ??
+    localStorage.getItem("movementMode") ??
+    "buttons";
 
 movementMode = movementMode === "geolocation" ? "geolocation" : "buttons";
 localStorage.setItem("movementMode", movementMode);
@@ -49,6 +59,7 @@ function applyMovementMode(mode: string) {
   const baseUrl = globalThis.location.origin + globalThis.location.pathname;
   globalThis.location.href = `${baseUrl}?movement=${mode}`;
 }
+
 const CLASSROOM_LATLNG = leaflet.latLng(
   36.997936938057016,
   -122.05703507501151,
@@ -84,6 +95,7 @@ interface GameSave {
   playerCell: { i: number; j: number };
   heldToken: number | null;
   modifiedCells: [string, number][];
+  movementMode: string;
 }
 
 function saveGameState() {
@@ -91,6 +103,7 @@ function saveGameState() {
     playerCell: { ...playerCell },
     heldToken,
     modifiedCells: [...modifiedCells.entries()],
+    movementMode,
   };
   localStorage.setItem("gameSave", JSON.stringify(data));
 }
@@ -105,17 +118,17 @@ function loadGameState() {
     playerCell.i = data.playerCell.i;
     playerCell.j = data.playerCell.j;
     heldToken = data.heldToken;
-
     modifiedCells.clear();
-    for (const [k, v] of data.modifiedCells) {
-      modifiedCells.set(k, v);
-    }
+    for (const [k, v] of data.modifiedCells) modifiedCells.set(k, v);
+
+    movementMode = data.movementMode ?? movementMode;
+    localStorage.setItem("movementMode", movementMode);
+
     const lat = CLASSROOM_LATLNG.lat + playerCell.i * TILE_DEGREES;
     const lng = CLASSROOM_LATLNG.lng + playerCell.j * TILE_DEGREES;
     playerMarker.setLatLng([lat, lng]);
     map.panTo([lat, lng]);
-  } catch (_err) {
-    console.error("Corrupt save data — clearing.");
+  } catch {
     localStorage.removeItem("gameSave");
   }
 }
@@ -126,11 +139,18 @@ function updateStatusPanel() {
     — at (${playerCell.i}, ${playerCell.j})
     — Mode: ${movementMode}
     <button id="modeToggle">Switch</button>
+    <button id="resetGame">Reset</button>
   `;
 
   document.getElementById("modeToggle")!.addEventListener("click", () => {
     const newMode = movementMode === "buttons" ? "geolocation" : "buttons";
     applyMovementMode(newMode);
+  });
+
+  document.getElementById("resetGame")!.addEventListener("click", () => {
+    localStorage.removeItem("gameSave");
+    const baseUrl = globalThis.location.origin + globalThis.location.pathname;
+    globalThis.location.href = `${baseUrl}?movement=buttons`;
   });
 }
 
@@ -139,7 +159,7 @@ function cellKey(i: number, j: number): string {
 }
 
 function cellBounds(i: number, j: number): leaflet.LatLngBounds {
-  return leaflet.latLngBounds([
+  return leaflet.latLngBounds(
     [
       CLASSROOM_LATLNG.lat + i * TILE_DEGREES,
       CLASSROOM_LATLNG.lng + j * TILE_DEGREES,
@@ -148,7 +168,7 @@ function cellBounds(i: number, j: number): leaflet.LatLngBounds {
       CLASSROOM_LATLNG.lat + (i + 1) * TILE_DEGREES,
       CLASSROOM_LATLNG.lng + (j + 1) * TILE_DEGREES,
     ],
-  ]);
+  );
 }
 
 function baseTokenForCell(i: number, j: number): number {
@@ -166,12 +186,12 @@ function setTokenAt(i: number, j: number, value: number) {
 }
 
 function isCellNearPlayer(i: number, j: number): boolean {
-  return Math.max(Math.abs(i - playerCell.i), Math.abs(j - playerCell.j)) <=
-    INTERACT_RANGE;
+  return Math.max(Math.abs(i - playerCell.i), Math.abs(j - playerCell.j)) <= INTERACT_RANGE;
 }
 
 function handleCellClick(i: number, j: number) {
   if (!isCellNearPlayer(i, j)) return;
+
   const cellToken = getTokenAt(i, j);
 
   if (heldToken === null && cellToken > 0) {
@@ -179,7 +199,6 @@ function handleCellClick(i: number, j: number) {
     setTokenAt(i, j, 0);
     updateStatusPanel();
     redrawCells();
-    saveGameState();
     return;
   }
 
@@ -189,7 +208,6 @@ function handleCellClick(i: number, j: number) {
     heldToken = null;
     updateStatusPanel();
     redrawCells();
-    saveGameState();
 
     if (newToken >= WIN_TOKEN_VALUE) {
       alert(`You crafted ${newToken}! GAME OVER.`);
@@ -221,16 +239,14 @@ function redrawCells() {
       if (token > 0) {
         const sw = bounds.getSouthWest();
         const ne = bounds.getNorthEast();
-        leaflet
-          .marker([(sw.lat + ne.lat) / 2, (sw.lng + ne.lng) / 2], {
-            interactive: false,
-            icon: leaflet.divIcon({
-              className: "token-label",
-              html: token.toString(),
-              iconSize: [30, 16],
-            }),
-          })
-          .addTo(cellsLayer);
+        leaflet.marker([(sw.lat + ne.lat) / 2, (sw.lng + ne.lng) / 2], {
+          interactive: false,
+          icon: leaflet.divIcon({
+            className: "token-label",
+            html: token.toString(),
+            iconSize: [30, 16],
+          }),
+        }).addTo(cellsLayer);
       }
     }
   }
@@ -250,6 +266,7 @@ function movePlayer(di: number, dj: number) {
   updateStatusPanel();
   saveGameState();
 }
+
 interface MovementController {
   start(): void;
 }
@@ -285,7 +302,6 @@ class GeoMovementController implements MovementController {
 
   start(): void {
     if (!navigator.geolocation) {
-      console.warn("GPS unsupported → fallback to buttons");
       new ButtonMovementController().start();
       return;
     }
@@ -302,19 +318,14 @@ class GeoMovementController implements MovementController {
 
         const dLat = latitude - this.lastLat;
         const dLng = longitude - this.lastLng;
-
         this.lastLat = latitude;
         this.lastLng = longitude;
 
         const moveI = Math.round(dLat / TILE_DEGREES);
         const moveJ = Math.round(dLng / TILE_DEGREES);
-
-        if (Math.abs(moveI) > 0 || Math.abs(moveJ) > 0) {
-          movePlayer(moveI, moveJ);
-        }
+        if (moveI !== 0 || moveJ !== 0) movePlayer(moveI, moveJ);
       },
-      (err) => {
-        console.error("GPS error:", err);
+      () => {
         new ButtonMovementController().start();
       },
       {
@@ -331,7 +342,6 @@ const controller: MovementController = movementMode === "geolocation"
   : new ButtonMovementController();
 
 controller.start();
-
 loadGameState();
 updateStatusPanel();
 redrawCells();
