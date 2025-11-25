@@ -17,7 +17,7 @@ style.textContent = `
     width: 30px;
     line-height: 16px;
   }
-  #modeToggle {
+  #modeToggle, #resetGame {
     margin-left: 10px;
     padding: 2px 6px;
     font-size: 0.7rem;
@@ -26,14 +26,27 @@ style.textContent = `
     cursor: pointer;
     border-radius: 4px;
   }
-  #resetGame {
-    margin-left: 6px;
-    padding: 2px 6px;
-    font-size: 0.7rem;
-    border: 1px solid #444;
+  #dpad {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .drow {
+    display: flex;
+    flex-direction: row;
+    gap: 4px;
+    justify-content: center;
+  }
+  .dBtn {
+    width: 48px;
+    height: 48px;
     background: #eee;
-    cursor: pointer;
-    border-radius: 4px;
+    border: 1px solid #444;
+    border-radius: 6px;
+    font-size: 1.2rem;
   }
 `;
 document.head.append(style);
@@ -45,6 +58,10 @@ document.body.append(mapDiv);
 const statusPanelDiv = document.createElement("div");
 statusPanelDiv.id = "statusPanel";
 document.body.append(statusPanelDiv);
+
+const dpadDiv = document.createElement("div");
+dpadDiv.id = "dpad";
+document.body.append(dpadDiv);
 
 const urlParams = new URLSearchParams(globalThis.location.search);
 let movementMode = urlParams.get("movement") ??
@@ -118,6 +135,7 @@ function loadGameState() {
     playerCell.i = data.playerCell.i;
     playerCell.j = data.playerCell.j;
     heldToken = data.heldToken;
+
     modifiedCells.clear();
     for (const [k, v] of data.modifiedCells) modifiedCells.set(k, v);
 
@@ -142,23 +160,25 @@ function updateStatusPanel() {
     <button id="resetGame">Reset</button>
   `;
 
-  document.getElementById("modeToggle")!.addEventListener("click", () => {
+  document.getElementById("modeToggle")!.onclick = () => {
     const newMode = movementMode === "buttons" ? "geolocation" : "buttons";
     applyMovementMode(newMode);
-  });
+  };
 
-  document.getElementById("resetGame")!.addEventListener("click", () => {
+  document.getElementById("resetGame")!.onclick = () => {
     localStorage.removeItem("gameSave");
     const baseUrl = globalThis.location.origin + globalThis.location.pathname;
     globalThis.location.href = `${baseUrl}?movement=buttons`;
-  });
+  };
+
+  dpadDiv.style.display = movementMode === "buttons" ? "block" : "none";
 }
 
 function cellKey(i: number, j: number): string {
   return `${i},${j}`;
 }
 
-function cellBounds(i: number, j: number): leaflet.LatLngBounds {
+function cellBounds(i: number, j: number) {
   return leaflet.latLngBounds(
     [
       CLASSROOM_LATLNG.lat + i * TILE_DEGREES,
@@ -171,12 +191,11 @@ function cellBounds(i: number, j: number): leaflet.LatLngBounds {
   );
 }
 
-function baseTokenForCell(i: number, j: number): number {
-  const r = luck(`${i},${j},base`);
-  return r < 0.4 ? 1 : 0;
+function baseTokenForCell(i: number, j: number) {
+  return luck(`${i},${j},base`) < 0.4 ? 1 : 0;
 }
 
-function getTokenAt(i: number, j: number): number {
+function getTokenAt(i: number, j: number) {
   return modifiedCells.get(cellKey(i, j)) ?? baseTokenForCell(i, j);
 }
 
@@ -185,7 +204,7 @@ function setTokenAt(i: number, j: number, value: number) {
   saveGameState();
 }
 
-function isCellNearPlayer(i: number, j: number): boolean {
+function isCellNearPlayer(i: number, j: number) {
   return Math.max(Math.abs(i - playerCell.i), Math.abs(j - playerCell.j)) <=
     INTERACT_RANGE;
 }
@@ -223,7 +242,6 @@ function redrawCells() {
     for (let dj = -DRAW_RADIUS; dj <= DRAW_RADIUS; dj++) {
       const ci = playerCell.i + di;
       const cj = playerCell.j + dj;
-
       const bounds = cellBounds(ci, cj);
       const token = getTokenAt(ci, cj);
       const near = isCellNearPlayer(ci, cj);
@@ -233,7 +251,6 @@ function redrawCells() {
         weight: 1,
         fillOpacity: 0,
       });
-
       rect.on("click", () => handleCellClick(ci, cj));
       rect.addTo(cellsLayer);
 
@@ -273,8 +290,10 @@ interface MovementController {
 }
 
 class ButtonMovementController implements MovementController {
-  start(): void {
-    globalThis.addEventListener("keydown", (e) => {
+  start() {
+    globalThis.onkeydown = (e) => {
+      if (movementMode !== "buttons") return;
+
       switch (e.key.toLowerCase()) {
         case "w":
         case "arrowup":
@@ -293,7 +312,7 @@ class ButtonMovementController implements MovementController {
           movePlayer(0, 1);
           break;
       }
-    });
+    };
   }
 }
 
@@ -301,7 +320,7 @@ class GeoMovementController implements MovementController {
   lastLat: number | null = null;
   lastLng: number | null = null;
 
-  start(): void {
+  start() {
     if (!navigator.geolocation) {
       new ButtonMovementController().start();
       return;
@@ -324,6 +343,7 @@ class GeoMovementController implements MovementController {
 
         const moveI = Math.round(dLat / TILE_DEGREES);
         const moveJ = Math.round(dLng / TILE_DEGREES);
+
         if (moveI !== 0 || moveJ !== 0) movePlayer(moveI, moveJ);
       },
       () => {
@@ -338,6 +358,26 @@ class GeoMovementController implements MovementController {
   }
 }
 
+function renderDPad() {
+  dpadDiv.innerHTML = `
+    <div class="drow">
+      <button class="dBtn" id="btnUp">↑</button>
+    </div>
+    <div class="drow">
+      <button class="dBtn" id="btnLeft">←</button>
+      <button class="dBtn" id="btnRight">→</button>
+    </div>
+    <div class="drow">
+      <button class="dBtn" id="btnDown">↓</button>
+    </div>
+  `;
+
+  document.getElementById("btnUp")!.onclick = () => movePlayer(1, 0);
+  document.getElementById("btnDown")!.onclick = () => movePlayer(-1, 0);
+  document.getElementById("btnLeft")!.onclick = () => movePlayer(0, -1);
+  document.getElementById("btnRight")!.onclick = () => movePlayer(0, 1);
+}
+
 const controller: MovementController = movementMode === "geolocation"
   ? new GeoMovementController()
   : new ButtonMovementController();
@@ -346,3 +386,4 @@ controller.start();
 loadGameState();
 updateStatusPanel();
 redrawCells();
+renderDPad();
