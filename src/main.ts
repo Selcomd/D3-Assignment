@@ -1,5 +1,6 @@
 // Yahir Rico
-// D3
+//  D3 Assignment
+
 import leaflet from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./style.css";
@@ -18,35 +19,37 @@ style.textContent = `
     line-height: 16px;
   }
   #modeToggle, #resetGame {
-    margin-left: 10px;
     padding: 2px 6px;
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     border: 1px solid #444;
-    background: #ddd;
+    background: #eee;
     cursor: pointer;
     border-radius: 4px;
+    margin-left: 8px;
   }
-  #dpad {
+  #touchControls {
     position: fixed;
-    bottom: 20px;
-    left: 20px;
+    bottom: 90px;
+    left: 50%;
+    transform: translateX(-50%);
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    align-items: center;
+    gap: 6px;
+    z-index: 9999;
   }
-  .drow {
+  .trow {
     display: flex;
-    flex-direction: row;
-    gap: 4px;
-    justify-content: center;
+    gap: 6px;
   }
-  .dBtn {
-    width: 48px;
-    height: 48px;
-    background: #eee;
-    border: 1px solid #444;
-    border-radius: 6px;
-    font-size: 1.2rem;
+  .tbtn {
+    width: 60px;
+    height: 60px;
+    background: white;
+    border: 2px solid #666;
+    border-radius: 12px;
+    font-size: 2rem;
+    text-align: center;
   }
 `;
 document.head.append(style);
@@ -59,9 +62,21 @@ const statusPanelDiv = document.createElement("div");
 statusPanelDiv.id = "statusPanel";
 document.body.append(statusPanelDiv);
 
-const dpadDiv = document.createElement("div");
-dpadDiv.id = "dpad";
-document.body.append(dpadDiv);
+const touchControls = document.createElement("div");
+touchControls.id = "touchControls";
+touchControls.innerHTML = `
+  <div class="trow">
+    <button class="tbtn" id="btnUp">↑</button>
+  </div>
+  <div class="trow">
+    <button class="tbtn" id="btnLeft">←</button>
+    <button class="tbtn" id="btnRight">→</button>
+  </div>
+  <div class="trow">
+    <button class="tbtn" id="btnDown">↓</button>
+  </div>
+`;
+document.body.append(touchControls);
 
 const urlParams = new URLSearchParams(globalThis.location.search);
 let movementMode = urlParams.get("movement") ??
@@ -131,7 +146,6 @@ function loadGameState() {
 
   try {
     const data: GameSave = JSON.parse(raw);
-
     playerCell.i = data.playerCell.i;
     playerCell.j = data.playerCell.j;
     heldToken = data.heldToken;
@@ -160,25 +174,25 @@ function updateStatusPanel() {
     <button id="resetGame">Reset</button>
   `;
 
-  document.getElementById("modeToggle")!.onclick = () => {
+  document.getElementById("modeToggle")!.addEventListener("click", () => {
     const newMode = movementMode === "buttons" ? "geolocation" : "buttons";
     applyMovementMode(newMode);
-  };
+  });
 
-  document.getElementById("resetGame")!.onclick = () => {
+  document.getElementById("resetGame")!.addEventListener("click", () => {
     localStorage.removeItem("gameSave");
     const baseUrl = globalThis.location.origin + globalThis.location.pathname;
     globalThis.location.href = `${baseUrl}?movement=buttons`;
-  };
+  });
 
-  dpadDiv.style.display = movementMode === "buttons" ? "block" : "none";
+  touchControls.style.display = movementMode === "buttons" ? "flex" : "none";
 }
 
 function cellKey(i: number, j: number): string {
   return `${i},${j}`;
 }
 
-function cellBounds(i: number, j: number) {
+function cellBounds(i: number, j: number): leaflet.LatLngBounds {
   return leaflet.latLngBounds(
     [
       CLASSROOM_LATLNG.lat + i * TILE_DEGREES,
@@ -191,11 +205,12 @@ function cellBounds(i: number, j: number) {
   );
 }
 
-function baseTokenForCell(i: number, j: number) {
-  return luck(`${i},${j},base`) < 0.4 ? 1 : 0;
+function baseTokenForCell(i: number, j: number): number {
+  const r = luck(`${i},${j},base`);
+  return r < 0.4 ? 1 : 0;
 }
 
-function getTokenAt(i: number, j: number) {
+function getTokenAt(i: number, j: number): number {
   return modifiedCells.get(cellKey(i, j)) ?? baseTokenForCell(i, j);
 }
 
@@ -204,14 +219,13 @@ function setTokenAt(i: number, j: number, value: number) {
   saveGameState();
 }
 
-function isCellNearPlayer(i: number, j: number) {
+function isCellNearPlayer(i: number, j: number): boolean {
   return Math.max(Math.abs(i - playerCell.i), Math.abs(j - playerCell.j)) <=
     INTERACT_RANGE;
 }
 
 function handleCellClick(i: number, j: number) {
   if (!isCellNearPlayer(i, j)) return;
-
   const cellToken = getTokenAt(i, j);
 
   if (heldToken === null && cellToken > 0) {
@@ -242,6 +256,7 @@ function redrawCells() {
     for (let dj = -DRAW_RADIUS; dj <= DRAW_RADIUS; dj++) {
       const ci = playerCell.i + di;
       const cj = playerCell.j + dj;
+
       const bounds = cellBounds(ci, cj);
       const token = getTokenAt(ci, cj);
       const near = isCellNearPlayer(ci, cj);
@@ -251,6 +266,7 @@ function redrawCells() {
         weight: 1,
         fillOpacity: 0,
       });
+
       rect.on("click", () => handleCellClick(ci, cj));
       rect.addTo(cellsLayer);
 
@@ -290,10 +306,25 @@ interface MovementController {
 }
 
 class ButtonMovementController implements MovementController {
-  start() {
-    globalThis.onkeydown = (e) => {
-      if (movementMode !== "buttons") return;
+  start(): void {
+    document.getElementById("btnUp")!.addEventListener(
+      "click",
+      () => movePlayer(1, 0),
+    );
+    document.getElementById("btnDown")!.addEventListener(
+      "click",
+      () => movePlayer(-1, 0),
+    );
+    document.getElementById("btnLeft")!.addEventListener(
+      "click",
+      () => movePlayer(0, -1),
+    );
+    document.getElementById("btnRight")!.addEventListener(
+      "click",
+      () => movePlayer(0, 1),
+    );
 
+    globalThis.addEventListener("keydown", (e) => {
       switch (e.key.toLowerCase()) {
         case "w":
         case "arrowup":
@@ -312,7 +343,7 @@ class ButtonMovementController implements MovementController {
           movePlayer(0, 1);
           break;
       }
-    };
+    });
   }
 }
 
@@ -320,12 +351,7 @@ class GeoMovementController implements MovementController {
   lastLat: number | null = null;
   lastLng: number | null = null;
 
-  start() {
-    if (!navigator.geolocation) {
-      new ButtonMovementController().start();
-      return;
-    }
-
+  start(): void {
     navigator.geolocation.watchPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
@@ -338,6 +364,7 @@ class GeoMovementController implements MovementController {
 
         const dLat = latitude - this.lastLat;
         const dLng = longitude - this.lastLng;
+
         this.lastLat = latitude;
         this.lastLng = longitude;
 
@@ -347,7 +374,8 @@ class GeoMovementController implements MovementController {
         if (moveI !== 0 || moveJ !== 0) movePlayer(moveI, moveJ);
       },
       () => {
-        new ButtonMovementController().start();
+        const fallback = new ButtonMovementController();
+        fallback.start();
       },
       {
         enableHighAccuracy: true,
@@ -358,26 +386,6 @@ class GeoMovementController implements MovementController {
   }
 }
 
-function renderDPad() {
-  dpadDiv.innerHTML = `
-    <div class="drow">
-      <button class="dBtn" id="btnUp">↑</button>
-    </div>
-    <div class="drow">
-      <button class="dBtn" id="btnLeft">←</button>
-      <button class="dBtn" id="btnRight">→</button>
-    </div>
-    <div class="drow">
-      <button class="dBtn" id="btnDown">↓</button>
-    </div>
-  `;
-
-  document.getElementById("btnUp")!.onclick = () => movePlayer(1, 0);
-  document.getElementById("btnDown")!.onclick = () => movePlayer(-1, 0);
-  document.getElementById("btnLeft")!.onclick = () => movePlayer(0, -1);
-  document.getElementById("btnRight")!.onclick = () => movePlayer(0, 1);
-}
-
 const controller: MovementController = movementMode === "geolocation"
   ? new GeoMovementController()
   : new ButtonMovementController();
@@ -386,4 +394,3 @@ controller.start();
 loadGameState();
 updateStatusPanel();
 redrawCells();
-renderDPad();
